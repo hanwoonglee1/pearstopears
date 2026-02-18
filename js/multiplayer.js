@@ -28,7 +28,9 @@ const ui = {
   judgeBtn: document.getElementById("mp-judge-pick"),
   phase: document.getElementById("mp-phase"),
   players: document.getElementById("mp-players"),
-  leaderboard: document.getElementById("mp-leaderboard")
+  leaderboard: document.getElementById("mp-leaderboard"),
+  singlePlayerShell: document.getElementById("singleplayer-shell"),
+  singlePlayerActionBtn: document.getElementById("action-button")
 };
 
 function loadIdentity() {
@@ -171,6 +173,19 @@ function renderHandOptions() {
   });
 }
 
+function syncSinglePlayerVisibility(multiplayerActive) {
+  if (ui.singlePlayerShell) {
+    ui.singlePlayerShell.classList.toggle("hidden", multiplayerActive);
+  }
+
+  if (ui.singlePlayerActionBtn) {
+    ui.singlePlayerActionBtn.disabled = multiplayerActive;
+    ui.singlePlayerActionBtn.title = multiplayerActive
+      ? "Single-player controls are hidden while multiplayer room mode is active."
+      : "";
+  }
+}
+
 function render() {
   const room = state.room;
   const phase = room?.phase || "lobby";
@@ -188,6 +203,9 @@ function render() {
   ui.phase.textContent = `Room: ${state.roomCode || "-"} | Phase: ${phase} | Round: ${room?.round || 0} | Judge: ${
     judge?.name || "-"
   } | Green: ${room?.greenCard?.text || "-"} | Hand: ${state.playerState.hand.length}`;
+
+  const multiplayerActive = Boolean(state.roomCode && state.playerId);
+  syncSinglePlayerVisibility(multiplayerActive);
 
   const playerLines = room
     ? room.players.map(

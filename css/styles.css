@@ -300,6 +300,10 @@ h2 {
   }
 }
 
+.hidden {
+  display: none !important;
+}
+
 @media (max-width: 760px) {
   .topbar {
     flex-direction: column;

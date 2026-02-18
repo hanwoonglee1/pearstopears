@@ -65,37 +65,39 @@
         </div>
       </section>
 
-      <section class="status-grid">
-        <div class="panel">
-          <h2>Players</h2>
-          <div id="players" class="players"></div>
-        </div>
-        <div class="panel">
-          <h2>Round</h2>
-          <p id="round-info"></p>
-          <p id="message" class="message"></p>
-        </div>
-      </section>
+      <div id="singleplayer-shell">
+        <section class="status-grid">
+          <div class="panel">
+            <h2>Players</h2>
+            <div id="players" class="players"></div>
+          </div>
+          <div class="panel">
+            <h2>Round</h2>
+            <p id="round-info"></p>
+            <p id="message" class="message"></p>
+          </div>
+        </section>
 
-      <section class="panel">
-        <h2>Green Prompt</h2>
-        <div id="green-card" class="green-zone"></div>
-      </section>
+        <section class="panel">
+          <h2>Green Prompt</h2>
+          <div id="green-card" class="green-zone"></div>
+        </section>
 
-      <section class="panel">
-        <h2>Submitted Red Cards</h2>
-        <div id="submissions" class="submissions"></div>
-      </section>
+        <section class="panel">
+          <h2>Submitted Red Cards</h2>
+          <div id="submissions" class="submissions"></div>
+        </section>
 
-      <section class="panel">
-        <h2>Your Hand</h2>
-        <div id="hand" class="hand"></div>
-      </section>
+        <section class="panel">
+          <h2>Your Hand</h2>
+          <div id="hand" class="hand"></div>
+        </section>
 
-      <section class="panel">
-        <h2>Round Log</h2>
-        <ul id="round-log" class="round-log"></ul>
-      </section>
+        <section class="panel">
+          <h2>Round Log</h2>
+          <ul id="round-log" class="round-log"></ul>
+        </section>
+      </div>
     </main>
 
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
