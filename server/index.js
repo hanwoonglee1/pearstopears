@@ -3,10 +3,25 @@ import express from "express";
 import { createServer } from "node:http";
 import { customAlphabet, nanoid } from "nanoid";
 import { Server } from "socket.io";
+import { redCards } from "../data/redCards.js";
+import { greenCards } from "../data/greenCards.js";
 
 const PORT = Number(process.env.PORT || 3000);
 const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const makeRoomCode = customAlphabet(ROOM_CODE_ALPHABET, 6);
+const HAND_SIZE = 7;
+
+const RED_CARD_POOL = redCards.map((card, index) => ({
+  id: `r-${index}`,
+  text: card.text,
+  tags: card.tags || []
+}));
+
+const GREEN_CARD_POOL = greenCards.map((card, index) => ({
+  id: `g-${index}`,
+  text: card.text,
+  tags: card.tags || []
+}));
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
@@ -42,10 +57,30 @@ const rooms = new Map();
  * @property {"lobby"|"submit"|"judge_pick"|"score"|"next_round"} phase
  * @property {number} round
  * @property {number} judgeIndex
- * @property {Map<string, { cardText: string }>} submissions
+ * @property {Map<string, SubmissionState>} submissions
  * @property {string|null} lastWinnerId
+ * @property {string|null} winningSubmissionId
  * @property {PlayerState[]} players
- * @property {Map<string, string[]>} privateHands
+ * @property {Map<string, CardState[]>} privateHands
+ * @property {CardState[]} redDeck
+ * @property {CardState[]} redDiscard
+ * @property {CardState[]} greenDeck
+ * @property {CardState[]} greenDiscard
+ * @property {CardState|null} currentGreenCard
+ */
+
+/**
+ * @typedef {Object} CardState
+ * @property {string} id
+ * @property {string} text
+ * @property {string[]} tags
+ */
+
+/**
+ * @typedef {Object} SubmissionState
+ * @property {string} id
+ * @property {string} playerId
+ * @property {CardState} card
  */
 
 function sanitizeName(input) {
@@ -56,9 +91,29 @@ function sanitizeName(input) {
   return trimmed.slice(0, 24);
 }
 
-function sanitizeCardText(input) {
-  const trimmed = String(input || "").trim();
-  return trimmed.slice(0, 80);
+function shuffle(cards) {
+  const next = [...cards];
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const temp = next[index];
+    next[index] = next[swapIndex];
+    next[swapIndex] = temp;
+  }
+  return next;
+}
+
+function refillDeckFromDiscard(deck, discard) {
+  if (deck.length > 0 || discard.length === 0) {
+    return;
+  }
+  const recycled = shuffle(discard);
+  discard.length = 0;
+  deck.push(...recycled);
+}
+
+function drawCard(deck, discard) {
+  refillDeckFromDiscard(deck, discard);
+  return deck.pop() || null;
 }
 
 function createEmptyRoom(hostName, socketId) {
@@ -70,9 +125,15 @@ function createEmptyRoom(hostName, socketId) {
     judgeIndex: 0,
     submissions: new Map(),
     lastWinnerId: null,
+    winningSubmissionId: null,
     players: [],
     // Private per-player hand storage for later phases. Never emitted to room snapshots.
-    privateHands: new Map()
+    privateHands: new Map(),
+    redDeck: [],
+    redDiscard: [],
+    greenDeck: [],
+    greenDiscard: [],
+    currentGreenCard: null
   };
 
   room.players.push({
@@ -142,6 +203,62 @@ function toLeaderboard(players) {
     .map((player) => ({ id: player.id, name: player.name, score: player.score }));
 }
 
+function initDecks(room) {
+  room.redDeck = shuffle(RED_CARD_POOL);
+  room.redDiscard = [];
+  room.greenDeck = shuffle(GREEN_CARD_POOL);
+  room.greenDiscard = [];
+  room.currentGreenCard = null;
+}
+
+function ensurePlayerHand(room, playerId) {
+  if (!room.privateHands.has(playerId)) {
+    room.privateHands.set(playerId, []);
+  }
+  return room.privateHands.get(playerId);
+}
+
+function dealToHandSize(room) {
+  room.players.forEach((player) => {
+    const hand = ensurePlayerHand(room, player.id);
+    while (hand.length < HAND_SIZE) {
+      const card = drawCard(room.redDeck, room.redDiscard);
+      if (!card) {
+        break;
+      }
+      hand.push(card);
+    }
+  });
+}
+
+function removeCardFromHand(room, playerId, cardId) {
+  const hand = ensurePlayerHand(room, playerId);
+  const cardIndex = hand.findIndex((entry) => entry.id === cardId);
+  if (cardIndex < 0) {
+    return null;
+  }
+  const [card] = hand.splice(cardIndex, 1);
+  return card || null;
+}
+
+function drawGreenForRound(room) {
+  room.currentGreenCard = drawCard(room.greenDeck, room.greenDiscard);
+}
+
+function resolveSubmitPhaseCompletion(room) {
+  if (room.phase !== "submit") {
+    return;
+  }
+  const judge = getJudge(room);
+  if (!judge) {
+    return;
+  }
+  const expected = getConnectedPlayers(room).filter((entry) => entry.id !== judge.id).length;
+  if (expected > 0 && room.submissions.size >= expected) {
+    room.phase = "judge_pick";
+  }
+}
+
 function toPublicRoomState(room) {
   const judge = getJudge(room);
   const connectedPlayers = getConnectedPlayers(room);
@@ -156,6 +273,8 @@ function toPublicRoomState(room) {
     hostPlayerId: room.hostPlayerId,
     judgePlayerId: judge ? judge.id : null,
     lastWinnerId: room.lastWinnerId,
+    winningSubmissionId: room.winningSubmissionId,
+    greenCard: room.currentGreenCard ? { id: room.currentGreenCard.id, text: room.currentGreenCard.text } : null,
     submissionCount: room.submissions.size,
     expectedSubmissionCount: nonJudgeCount,
     players: room.players.map((player) => ({
@@ -169,16 +288,35 @@ function toPublicRoomState(room) {
     leaderboard: toLeaderboard(room.players),
     submissions:
       room.phase === "judge_pick" || room.phase === "score"
-        ? [...room.submissions.entries()].map(([playerId, submission]) => ({
-            playerId,
-            cardText: submission.cardText
+        ? [...room.submissions.values()].map((submission) => ({
+            id: submission.id,
+            cardId: submission.card.id,
+            cardText: submission.card.text
           }))
         : []
   };
 }
 
+function emitPlayerState(room, player) {
+  if (!player.connected || !player.socketId) {
+    return;
+  }
+  const hand = ensurePlayerHand(room, player.id).map((card) => ({ id: card.id, text: card.text }));
+  io.to(player.socketId).emit("player:state", {
+    roomCode: room.code,
+    playerId: player.id,
+    hand,
+    submitted: [...room.submissions.values()].some((entry) => entry.playerId === player.id)
+  });
+}
+
+function emitAllPlayerStates(room) {
+  room.players.forEach((player) => emitPlayerState(room, player));
+}
+
 function emitRoomUpdate(room) {
   io.to(room.code).emit("room:update", toPublicRoomState(room));
+  emitAllPlayerStates(room);
 }
 
 function emitError(socket, message) {
@@ -200,6 +338,12 @@ function beginSubmitPhase(room) {
   room.phase = "submit";
   room.submissions.clear();
   room.lastWinnerId = null;
+  room.winningSubmissionId = null;
+  if (room.currentGreenCard) {
+    room.greenDiscard.push(room.currentGreenCard);
+  }
+  drawGreenForRound(room);
+  dealToHandSize(room);
   emitRoomUpdate(room);
 }
 
@@ -332,10 +476,17 @@ io.on("connection", (socket) => {
     room.round = 1;
     room.phase = "next_round";
     room.judgeIndex = 0;
+    room.submissions.clear();
+    room.lastWinnerId = null;
+    room.winningSubmissionId = null;
+    room.privateHands.clear();
     room.players.forEach((entry) => {
       entry.score = 0;
       entry.ready = false;
+      ensurePlayerHand(room, entry.id);
     });
+    initDecks(room);
+    dealToHandSize(room);
 
     emitRoomUpdate(room);
     beginSubmitPhase(room);
@@ -376,18 +527,22 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const cardText = sanitizeCardText(payload.cardText);
-    if (!cardText) {
-      emitError(socket, "Card text is required.");
+    const cardId = String(payload.cardId || "").trim();
+    if (!cardId) {
+      emitError(socket, "Card id is required.");
       return;
     }
 
-    room.submissions.set(player.id, { cardText });
-
-    const expected = getConnectedPlayers(room).filter((entry) => entry.id !== judge.id).length;
-    if (room.submissions.size >= expected && expected > 0) {
-      room.phase = "judge_pick";
+    const card = removeCardFromHand(room, player.id, cardId);
+    if (!card) {
+      emitError(socket, "Card must be in your hand.");
+      return;
     }
+
+    const submissionId = nanoid(10);
+    room.submissions.set(submissionId, { id: submissionId, playerId: player.id, card });
+
+    resolveSubmitPhaseCompletion(room);
 
     emitRoomUpdate(room);
   });
@@ -412,21 +567,28 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const winnerPlayerId = String(payload.winnerPlayerId || "");
-    if (!room.submissions.has(winnerPlayerId)) {
-      emitError(socket, "Winner must be one of the submitted players.");
+    const submissionId = String(payload.submissionId || "").trim();
+    const winningSubmission = room.submissions.get(submissionId) || null;
+    if (!winningSubmission) {
+      emitError(socket, "Winner must be one of the submitted cards.");
       return;
     }
 
+    const winnerPlayerId = winningSubmission.playerId;
     const winner = getPlayerById(room, winnerPlayerId);
     if (!winner) {
       emitError(socket, "Winner not found.");
       return;
     }
 
+    room.submissions.forEach((submission) => {
+      room.redDiscard.push(submission.card);
+    });
+    room.winningSubmissionId = submissionId;
     winner.score += 1;
     room.lastWinnerId = winner.id;
     room.phase = "score";
+    dealToHandSize(room);
 
     emitRoomUpdate(room);
   });
@@ -486,6 +648,7 @@ io.on("connection", (socket) => {
       }
     }
 
+    resolveSubmitPhaseCompletion(room);
     emitRoomUpdate(room);
     ensureHostRoomNotEmpty(room.code);
   });

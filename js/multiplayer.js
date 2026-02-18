@@ -6,6 +6,7 @@ const state = {
   playerId: "",
   playerName: "",
   room: null,
+  playerState: { hand: [], submitted: false },
   isHost: false,
   connected: false
 };
@@ -21,7 +22,7 @@ const ui = {
   readyBtn: document.getElementById("mp-toggle-ready"),
   startBtn: document.getElementById("mp-start-game"),
   nextBtn: document.getElementById("mp-next-round"),
-  submitInput: document.getElementById("mp-submit-input"),
+  handSelect: document.getElementById("mp-hand-select"),
   submitBtn: document.getElementById("mp-submit-card"),
   judgeTarget: document.getElementById("mp-judge-target"),
   judgeBtn: document.getElementById("mp-judge-pick"),
@@ -95,6 +96,7 @@ function ensureSocket(serverUrl) {
     state.roomCode = payload.roomCode;
     state.playerId = payload.playerId;
     state.isHost = Boolean(payload.isHost);
+    state.playerState = { hand: [], submitted: false };
 
     ui.roomCode.value = payload.roomCode;
     if (state.playerName) {
@@ -108,6 +110,17 @@ function ensureSocket(serverUrl) {
 
   state.socket.on("room:update", (roomState) => {
     state.room = roomState;
+    render();
+  });
+
+  state.socket.on("player:state", (playerState) => {
+    if (playerState?.playerId !== state.playerId) {
+      return;
+    }
+    state.playerState = {
+      hand: Array.isArray(playerState.hand) ? playerState.hand : [],
+      submitted: Boolean(playerState.submitted)
+    };
     render();
   });
 
@@ -140,11 +153,21 @@ function renderJudgeOptions() {
   }
 
   state.room.submissions.forEach((submission) => {
-    const player = state.room.players.find((entry) => entry.id === submission.playerId);
     const option = document.createElement("option");
-    option.value = submission.playerId;
-    option.textContent = `${submission.cardText} (${player ? player.name : submission.playerId})`;
+    option.value = submission.id;
+    option.textContent = submission.cardText;
     ui.judgeTarget.append(option);
+  });
+}
+
+function renderHandOptions() {
+  ui.handSelect.innerHTML = "";
+  const hand = state.playerState?.hand || [];
+  hand.forEach((card) => {
+    const option = document.createElement("option");
+    option.value = card.id;
+    option.textContent = card.text;
+    ui.handSelect.append(option);
   });
 }
 
@@ -156,11 +179,15 @@ function render() {
   const me = room?.players?.find((player) => player.id === state.playerId);
   const canReady = Boolean(room && phase === "lobby" && me);
   const canStart = Boolean(room && phase === "lobby" && state.isHost && room.players.length >= 3);
-  const canSubmit = Boolean(room && phase === "submit" && me && me.id !== judgeId);
+  const canSubmit = Boolean(
+    room && phase === "submit" && me && me.id !== judgeId && !state.playerState.submitted && state.playerState.hand.length > 0
+  );
   const canJudge = Boolean(room && phase === "judge_pick" && me && me.id === judgeId);
   const canNext = Boolean(room && phase === "score" && state.isHost);
 
-  ui.phase.textContent = `Room: ${state.roomCode || "-"} | Phase: ${phase} | Round: ${room?.round || 0} | Judge: ${judge?.name || "-"}`;
+  ui.phase.textContent = `Room: ${state.roomCode || "-"} | Phase: ${phase} | Round: ${room?.round || 0} | Judge: ${
+    judge?.name || "-"
+  } | Green: ${room?.greenCard?.text || "-"} | Hand: ${state.playerState.hand.length}`;
 
   const playerLines = room
     ? room.players.map(
@@ -179,12 +206,13 @@ function render() {
 
   ui.readyBtn.disabled = !canReady;
   ui.startBtn.disabled = !canStart;
-  ui.submitInput.disabled = !canSubmit;
+  ui.handSelect.disabled = !canSubmit;
   ui.submitBtn.disabled = !canSubmit;
   ui.judgeTarget.disabled = !canJudge;
   ui.judgeBtn.disabled = !canJudge;
   ui.nextBtn.disabled = !canNext;
 
+  renderHandOptions();
   renderJudgeOptions();
 }
 
@@ -229,22 +257,21 @@ function startGame() {
 }
 
 function submitCard() {
-  const text = ui.submitInput.value.trim();
-  if (!text || !state.socket || !state.roomCode) {
+  const cardId = ui.handSelect.value;
+  if (!cardId || !state.socket || !state.roomCode) {
     return;
   }
 
-  state.socket.emit("round:submit", { roomCode: state.roomCode, cardText: text });
-  ui.submitInput.value = "";
+  state.socket.emit("round:submit", { roomCode: state.roomCode, cardId });
 }
 
 function judgePick() {
-  const winnerPlayerId = ui.judgeTarget.value;
-  if (!winnerPlayerId || !state.socket || !state.roomCode) {
+  const submissionId = ui.judgeTarget.value;
+  if (!submissionId || !state.socket || !state.roomCode) {
     return;
   }
 
-  state.socket.emit("round:judge_pick", { roomCode: state.roomCode, winnerPlayerId });
+  state.socket.emit("round:judge_pick", { roomCode: state.roomCode, submissionId });
 }
 
 function nextRound() {
