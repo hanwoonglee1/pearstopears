@@ -77,7 +77,7 @@ All events are Socket.IO events.
   - toggles caller's ready state in lobby
 - `game:start`
   - payload: `{ roomCode: string }`
-  - host-only; requires at least 3 connected players
+  - host-only; requires at least 2 connected players
 - `round:submit`
   - payload: `{ roomCode: string, cardId: string }`
   - non-judge players submit one red card by id; id must be in their private hand

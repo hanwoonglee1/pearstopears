@@ -193,7 +193,8 @@ function render() {
   const judge = room?.players?.find((player) => player.id === judgeId);
   const me = room?.players?.find((player) => player.id === state.playerId);
   const canReady = Boolean(room && phase === "lobby" && me);
-  const canStart = Boolean(room && phase === "lobby" && state.isHost && room.players.length >= 3);
+  const connectedCount = room ? room.players.filter((player) => player.connected).length : 0;
+  const canStart = Boolean(room && phase === "lobby" && state.isHost && connectedCount >= 2);
   const canSubmit = Boolean(
     room && phase === "submit" && me && me.id !== judgeId && !state.playerState.submitted && state.playerState.hand.length > 0
   );
@@ -224,6 +225,11 @@ function render() {
 
   ui.readyBtn.disabled = !canReady;
   ui.startBtn.disabled = !canStart;
+  if (room && phase === "lobby" && state.isHost && connectedCount < 2) {
+    ui.startBtn.title = "Need at least 2 connected players to start.";
+  } else {
+    ui.startBtn.title = "";
+  }
   ui.handSelect.disabled = !canSubmit;
   ui.submitBtn.disabled = !canSubmit;
   ui.judgeTarget.disabled = !canJudge;

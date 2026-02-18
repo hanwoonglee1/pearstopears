@@ -468,8 +468,8 @@ io.on("connection", (socket) => {
     }
 
     const connectedPlayers = getConnectedPlayers(room);
-    if (connectedPlayers.length < 3) {
-      emitError(socket, "At least 3 connected players are required to start.");
+    if (connectedPlayers.length < 2) {
+      emitError(socket, "At least 2 connected players are required to start.");
       return;
     }
 
