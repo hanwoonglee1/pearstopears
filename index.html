@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pears to Pears</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>Pears to Pears</h1>
+          <p>Apples-to-Apples inspired local party card game</p>
+        </div>
+        <button id="action-button" class="primary">Start Game</button>
+      </header>
+
+      <section class="status-grid">
+        <div class="panel">
+          <h2>Players</h2>
+          <div id="players" class="players"></div>
+        </div>
+        <div class="panel">
+          <h2>Round</h2>
+          <p id="round-info"></p>
+          <p id="message" class="message"></p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Green Prompt</h2>
+        <div id="green-card" class="green-zone"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Submitted Red Cards</h2>
+        <div id="submissions" class="submissions"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Your Hand</h2>
+        <div id="hand" class="hand"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Round Log</h2>
+        <ul id="round-log" class="round-log"></ul>
+      </section>
+    </main>
+
+    <script type="module" src="js/game.js"></script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "pearstopears",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "validate": "node scripts/validate-data.js"
+  }
+}
