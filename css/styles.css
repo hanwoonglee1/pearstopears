@@ -234,6 +234,57 @@ h2 {
   margin-bottom: 0.35rem;
 }
 
+.mp-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.65rem;
+}
+
+.mp-controls label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.mp-controls input,
+.mp-round-actions input,
+.mp-round-actions select {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  border: 1px solid rgba(24, 32, 34, 0.18);
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--ink);
+  font: inherit;
+}
+
+.mp-actions,
+.mp-round-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.mp-actions button,
+.mp-round-actions button {
+  border-radius: 999px;
+  border: 1px solid rgba(24, 32, 34, 0.16);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+  padding: 0.45rem 0.8rem;
+  font-family: "Space Grotesk", sans-serif;
+  cursor: pointer;
+}
+
+.mp-actions button:disabled,
+.mp-round-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .fade-in {
   animation: fadeInUp 260ms ease;
 }

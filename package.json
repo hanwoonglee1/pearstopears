@@ -4,6 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "validate": "node scripts/validate-data.js"
+    "validate": "node scripts/validate-data.js",
+    "start:server": "node server/index.js",
+    "dev:server": "node --watch server/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "nanoid": "^5.1.5",
+    "socket.io": "^4.8.1"
   }
 }

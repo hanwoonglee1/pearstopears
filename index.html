@@ -22,6 +22,49 @@
         <button id="action-button" class="primary">Start Game</button>
       </header>
 
+      <section id="multiplayer-panel" class="panel">
+        <h2>Multiplayer Lobby (Phase 1)</h2>
+        <p id="mp-status" class="message">Connect to the multiplayer server to create or join a room.</p>
+        <div class="mp-controls">
+          <label>
+            Server URL
+            <input id="mp-server-url" type="text" placeholder="http://localhost:3000" />
+          </label>
+          <label>
+            Name
+            <input id="mp-player-name" type="text" placeholder="Player name" maxlength="24" />
+          </label>
+          <label>
+            Room Code
+            <input id="mp-room-code" type="text" placeholder="ABC123" maxlength="6" />
+          </label>
+        </div>
+        <div class="mp-actions">
+          <button id="mp-create-room" class="primary" type="button">Create Room</button>
+          <button id="mp-join-room" type="button">Join Room</button>
+          <button id="mp-toggle-ready" type="button">Toggle Ready</button>
+          <button id="mp-start-game" type="button">Start Multiplayer Game</button>
+          <button id="mp-next-round" type="button">Next Round</button>
+        </div>
+        <p id="mp-phase" class="muted">Room: - | Phase: lobby | Round: 0 | Judge: -</p>
+        <div class="mp-round-actions">
+          <input id="mp-submit-input" type="text" placeholder="Submit placeholder card text" maxlength="80" />
+          <button id="mp-submit-card" type="button">Submit</button>
+          <select id="mp-judge-target"></select>
+          <button id="mp-judge-pick" type="button">Judge Pick</button>
+        </div>
+        <div class="status-grid">
+          <div class="panel">
+            <h3>Room Players</h3>
+            <ul id="mp-players" class="round-log"></ul>
+          </div>
+          <div class="panel">
+            <h3>Leaderboard</h3>
+            <ul id="mp-leaderboard" class="round-log"></ul>
+          </div>
+        </div>
+      </section>
+
       <section class="status-grid">
         <div class="panel">
           <h2>Players</h2>
@@ -55,6 +98,8 @@
       </section>
     </main>
 
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
     <script type="module" src="js/game.js"></script>
+    <script type="module" src="js/multiplayer.js"></script>
   </body>
 </html>
