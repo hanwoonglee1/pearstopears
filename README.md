@@ -7,7 +7,7 @@ A browser-playable, Apples to Apples inspired party card game built with pure HT
 - Existing static single-player mode (1 human + 4 AI) remains playable
 - Multiplayer phase-2 architecture with Node.js + Express + Socket.IO
 - Room lifecycle: create, join, ready toggle, host start
-- Authoritative server phases: `lobby -> submit -> judge_pick -> score -> next_round`
+- Authoritative server phases: `lobby -> submit -> judge_pick -> score -> next_round` (plus terminal `game_over`)
 - Judge rotation each round + score leaderboard
 - Server-side red/green deck handling with discard reshuffle
 - Private per-player hand state via dedicated event channel
@@ -78,6 +78,9 @@ All events are Socket.IO events.
 - `game:start`
   - payload: `{ roomCode: string }`
   - host-only; requires at least 2 connected players
+- `game:rematch`
+  - payload: `{ roomCode: string }`
+  - host-only; allowed in `game_over`; requires at least 2 connected players
 - `round:submit`
   - payload: `{ roomCode: string, cardId: string }`
   - non-judge players submit one red card by id; id must be in their private hand
@@ -97,7 +100,7 @@ All events are Socket.IO events.
   - authoritative snapshot payload:
     - `{`
     - `  roomCode: string,`
-    - `  phase: "lobby"|"submit"|"judge_pick"|"score"|"next_round",`
+    - `  phase: "lobby"|"submit"|"judge_pick"|"score"|"next_round"|"game_over",`
     - `  round: number,`
     - `  hostPlayerId: string,`
     - `  judgePlayerId: string|null,`

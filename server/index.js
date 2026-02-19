@@ -10,6 +10,7 @@ const PORT = Number(process.env.PORT || 3000);
 const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const makeRoomCode = customAlphabet(ROOM_CODE_ALPHABET, 6);
 const HAND_SIZE = 7;
+const WIN_SCORE = 10;
 
 const RED_CARD_POOL = redCards.map((card, index) => ({
   id: `r-${index}`,
@@ -54,7 +55,7 @@ const rooms = new Map();
  * @typedef {Object} RoomState
  * @property {string} code
  * @property {string} hostPlayerId
- * @property {"lobby"|"submit"|"judge_pick"|"score"|"next_round"} phase
+ * @property {"lobby"|"submit"|"judge_pick"|"score"|"next_round"|"game_over"} phase
  * @property {number} round
  * @property {number} judgeIndex
  * @property {Map<string, SubmissionState>} submissions
@@ -286,8 +287,9 @@ function toPublicRoomState(room) {
       isHost: player.id === room.hostPlayerId
     })),
     leaderboard: toLeaderboard(room.players),
+    winnerId: room.phase === "game_over" ? toLeaderboard(room.players)[0]?.id || null : null,
     submissions:
-      room.phase === "judge_pick" || room.phase === "score"
+      room.phase === "judge_pick" || room.phase === "score" || room.phase === "game_over"
         ? [...room.submissions.values()].map((submission) => ({
             id: submission.id,
             cardId: submission.card.id,
@@ -587,6 +589,16 @@ io.on("connection", (socket) => {
     room.winningSubmissionId = submissionId;
     winner.score += 1;
     room.lastWinnerId = winner.id;
+
+    if (winner.score >= WIN_SCORE) {
+      room.phase = "game_over";
+      room.submissions.clear();
+      room.winningSubmissionId = null;
+      room.currentGreenCard = null;
+      emitRoomUpdate(room);
+      return;
+    }
+
     room.phase = "score";
     dealToHandSize(room);
 
@@ -617,6 +629,50 @@ io.on("connection", (socket) => {
     room.phase = "next_round";
     emitRoomUpdate(room);
 
+    beginSubmitPhase(room);
+  });
+
+  socket.on("game:rematch", (payload = {}) => {
+    const roomCode = String(payload.roomCode || socket.data.roomCode || "").toUpperCase();
+    const room = rooms.get(roomCode);
+    if (!room) {
+      emitError(socket, "Room not found.");
+      return;
+    }
+
+    if (room.phase !== "game_over") {
+      emitError(socket, "Rematch is only available after game over.");
+      return;
+    }
+
+    const actingPlayer = getPlayerBySocket(room, socket.id);
+    if (!actingPlayer || actingPlayer.id !== room.hostPlayerId) {
+      emitError(socket, "Only the host can start a rematch.");
+      return;
+    }
+
+    const connectedPlayers = getConnectedPlayers(room);
+    if (connectedPlayers.length < 2) {
+      emitError(socket, "At least 2 connected players are required to rematch.");
+      return;
+    }
+
+    room.round = 1;
+    room.phase = "next_round";
+    room.judgeIndex = 0;
+    room.submissions.clear();
+    room.lastWinnerId = null;
+    room.winningSubmissionId = null;
+    room.privateHands.clear();
+    room.players.forEach((entry) => {
+      entry.score = 0;
+      entry.ready = false;
+      ensurePlayerHand(room, entry.id);
+    });
+    initDecks(room);
+    dealToHandSize(room);
+
+    emitRoomUpdate(room);
     beginSubmitPhase(room);
   });
 

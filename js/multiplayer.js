@@ -195,15 +195,21 @@ function render() {
   const canReady = Boolean(room && phase === "lobby" && me);
   const connectedCount = room ? room.players.filter((player) => player.connected).length : 0;
   const canStart = Boolean(room && phase === "lobby" && state.isHost && connectedCount >= 2);
+  const canRematch = Boolean(room && phase === "game_over" && state.isHost && connectedCount >= 2);
   const canSubmit = Boolean(
     room && phase === "submit" && me && me.id !== judgeId && !state.playerState.submitted && state.playerState.hand.length > 0
   );
   const canJudge = Boolean(room && phase === "judge_pick" && me && me.id === judgeId);
   const canNext = Boolean(room && phase === "score" && state.isHost);
+  const topPlayer = room?.leaderboard?.[0] || null;
 
   ui.phase.textContent = `Room: ${state.roomCode || "-"} | Phase: ${phase} | Round: ${room?.round || 0} | Judge: ${
     judge?.name || "-"
   } | Green: ${room?.greenCard?.text || "-"} | Hand: ${state.playerState.hand.length}`;
+
+  if (phase === "game_over" && topPlayer) {
+    setStatus(`Game over. Winner: ${topPlayer.name} (${topPlayer.score}). Host can start rematch.`);
+  }
 
   const multiplayerActive = Boolean(state.roomCode && state.playerId);
   syncSinglePlayerVisibility(multiplayerActive);
@@ -224,9 +230,12 @@ function render() {
   renderList(ui.leaderboard, leaderboardLines);
 
   ui.readyBtn.disabled = !canReady;
-  ui.startBtn.disabled = !canStart;
+  ui.startBtn.disabled = !(canStart || canRematch);
+  ui.startBtn.textContent = phase === "game_over" ? "Start Rematch" : "Start Multiplayer Game";
   if (room && phase === "lobby" && state.isHost && connectedCount < 2) {
     ui.startBtn.title = "Need at least 2 connected players to start.";
+  } else if (room && phase === "game_over" && state.isHost && connectedCount < 2) {
+    ui.startBtn.title = "Need at least 2 connected players to rematch.";
   } else {
     ui.startBtn.title = "";
   }
@@ -277,6 +286,12 @@ function startGame() {
   if (!state.socket || !state.roomCode) {
     return;
   }
+
+  if (state.room?.phase === "game_over") {
+    state.socket.emit("game:rematch", { roomCode: state.roomCode });
+    return;
+  }
+
   state.socket.emit("game:start", { roomCode: state.roomCode });
 }
 
